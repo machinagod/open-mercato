@@ -49,7 +49,19 @@ export type JobHandler<T = unknown> = (
 // ============================================================================
 
 /** Available queue strategy types */
-export type QueueStrategyType = 'local' | 'async'
+export type QueueStrategyType = 'local' | 'async' | 'postgres'
+
+/**
+ * Options for the Postgres-backed queue strategy.
+ */
+export type PostgresQueueOptions = {
+  /** Postgres connection string. Defaults to `DATABASE_URL`. */
+  connectionString?: string
+  /** Max delivery attempts before a job is marked failed. Defaults to 3. */
+  maxAttempts?: number
+  /** Jobs claimed per `process()` call. Defaults to 25. */
+  concurrency?: number
+}
 
 /**
  * Options for local (file-based) queue strategy.

@@ -1,6 +1,7 @@
-import type { Queue, LocalQueueOptions, AsyncQueueOptions, QueueStrategyType } from './types'
+import type { Queue, LocalQueueOptions, AsyncQueueOptions, PostgresQueueOptions, QueueStrategyType } from './types'
 import { createLocalQueue } from './strategies/local'
 import { createAsyncQueue } from './strategies/async'
+import { createPostgresQueue } from './strategies/postgres'
 import { getRedisUrlOrThrow } from '@open-mercato/shared/lib/redis/connection'
 
 /**
@@ -36,20 +37,29 @@ export function createQueue<T = unknown>(
   options?: AsyncQueueOptions
 ): Queue<T>
 
+export function createQueue<T = unknown>(
+  name: string,
+  strategy: 'postgres',
+  options?: PostgresQueueOptions
+): Queue<T>
+
 // General overload for dynamic strategy (union type)
 export function createQueue<T = unknown>(
   name: string,
-  strategy: 'local' | 'async',
-  options?: LocalQueueOptions | AsyncQueueOptions
+  strategy: QueueStrategyType,
+  options?: LocalQueueOptions | AsyncQueueOptions | PostgresQueueOptions
 ): Queue<T>
 
 export function createQueue<T = unknown>(
   name: string,
-  strategy: 'local' | 'async',
-  options?: LocalQueueOptions | AsyncQueueOptions
+  strategy: QueueStrategyType,
+  options?: LocalQueueOptions | AsyncQueueOptions | PostgresQueueOptions
 ): Queue<T> {
   if (strategy === 'async') {
     return createAsyncQueue<T>(name, options as AsyncQueueOptions)
+  }
+  if (strategy === 'postgres') {
+    return createPostgresQueue<T>(name, options as PostgresQueueOptions)
   }
 
   return createLocalQueue<T>(name, options as LocalQueueOptions)
@@ -59,7 +69,10 @@ export function createQueue<T = unknown>(
  * Resolve the queue strategy from `QUEUE_STRATEGY`. Defaults to `'local'`.
  */
 export function resolveQueueStrategy(): QueueStrategyType {
-  return process.env.QUEUE_STRATEGY === 'async' ? 'async' : 'local'
+  const strategy = process.env.QUEUE_STRATEGY
+  if (strategy === 'async') return 'async'
+  if (strategy === 'postgres') return 'postgres'
+  return 'local'
 }
 
 /**
@@ -90,6 +103,9 @@ export function createModuleQueue<T = unknown>(
       connection: { url: getRedisUrlOrThrow('QUEUE') },
       concurrency: options?.concurrency,
     })
+  }
+  if (strategy === 'postgres') {
+    return createPostgresQueue<T>(name, { concurrency: options?.concurrency })
   }
   return createLocalQueue<T>(name, { concurrency: options?.concurrency })
 }
