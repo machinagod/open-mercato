@@ -30,7 +30,6 @@
     "@mikro-orm/decorators": "^7.1.1",
     "@mikro-orm/migrations": "^7.1.1",
     "@mikro-orm/postgresql": "^7.1.1",
-    "@napi-rs/canvas": "^1.0.0",
     "@open-mercato/ai-assistant": "workspace:*",
     "@open-mercato/cache": "workspace:*",
     "@open-mercato/checkout": "workspace:*",
@@ -99,8 +98,10 @@
     "typescript": "^6.0.3"
   },
   "optionalDependencies": {
+    "@napi-rs/canvas": "^1.0.0",
     "better-sqlite3": "^12.10.0",
     "bullmq": "^5.77.3",
-    "ioredis": "^5.10.1"
+    "ioredis": "^5.10.1",
+    "wasm-vips": "^0.0.13"
   }
 }

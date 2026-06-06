@@ -24,7 +24,85 @@ type SqliteDatabase = {
 type SqliteConstructor = new (file: string) => SqliteDatabase
 type SqliteModule = SqliteConstructor | { default: SqliteConstructor }
 
+// node:sqlite shape (Deno + Node 24+). Used instead of the native better-sqlite3
+// addon under Deno, where native nan addons cannot load.
+type NodeSqliteStatement = {
+  get(...args: unknown[]): unknown
+  all(...args: unknown[]): unknown[]
+  run(...args: unknown[]): { changes: number | bigint; lastInsertRowid: number | bigint }
+}
+type NodeSqliteDb = {
+  prepare(sql: string): NodeSqliteStatement
+  exec(sql: string): void
+  close(): void
+}
+
+// Local copy of the canonical helper in @open-mercato/shared/lib/runtime/detect.
+// Inlined because cache cannot depend on shared (shared depends on cache).
+function isDenoRuntime(): boolean {
+  const d = (globalThis as { Deno?: { version?: { deno?: string } } }).Deno
+  return typeof d !== 'undefined' && typeof d?.version?.deno === 'string'
+}
+
 const sqliteRequire = createRequire(path.join(process.cwd(), 'package.json'))
+
+const CREATE_TABLES_SQL = `
+  CREATE TABLE IF NOT EXISTS cache_entries (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    expires_at INTEGER,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS cache_tags (
+    key TEXT NOT NULL,
+    tag TEXT NOT NULL,
+    PRIMARY KEY (key, tag),
+    FOREIGN KEY (key) REFERENCES cache_entries(key) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_cache_tags_tag ON cache_tags(tag);
+  CREATE INDEX IF NOT EXISTS idx_cache_entries_expires_at ON cache_entries(expires_at);
+`
+
+function openBetterSqlite(filePath: string): SqliteDatabase {
+  const imported = sqliteRequire('better-sqlite3') as SqliteModule
+  const Database = typeof imported === 'function' ? imported : imported.default
+  return new Database(filePath)
+}
+
+// Adapt node:sqlite's DatabaseSync to the better-sqlite3-shaped SqliteDatabase
+// interface the strategy logic expects (incl. a BEGIN/COMMIT/ROLLBACK transaction
+// helper, which node:sqlite does not provide natively).
+async function openNodeSqlite(filePath: string): Promise<SqliteDatabase> {
+  const mod = (await import('node:sqlite')) as { DatabaseSync: new (p: string) => NodeSqliteDb }
+  const raw = new mod.DatabaseSync(filePath)
+  return {
+    prepare<TResult = unknown>(sql: string) {
+      const stmt = raw.prepare(sql)
+      return {
+        get: (...args: unknown[]) => stmt.get(...args) as TResult | undefined,
+        all: (...args: unknown[]) => stmt.all(...args) as TResult[],
+        run: (...args: unknown[]) => ({ changes: Number(stmt.run(...args).changes) }),
+      }
+    },
+    exec: (sql: string) => raw.exec(sql),
+    transaction<TResult>(fn: () => TResult) {
+      return () => {
+        raw.exec('BEGIN')
+        try {
+          const result = fn()
+          raw.exec('COMMIT')
+          return result
+        } catch (error) {
+          try { raw.exec('ROLLBACK') } catch { /* ignore */ }
+          throw error
+        }
+      }
+    },
+    close: () => raw.close(),
+  }
+}
 
 /**
  * SQLite cache strategy with tag support
@@ -42,41 +120,22 @@ export function createSqliteStrategy(dbPath?: string, options?: { defaultTtl?: n
   async function getDb(): Promise<SqliteDatabase> {
     if (db) return db
 
+    // Under Deno the native better-sqlite3 addon cannot load; use node:sqlite.
+    // On Node the native driver is kept (unchanged behavior).
+    const driver = isDenoRuntime() ? 'node:sqlite' : 'better-sqlite3'
+
     try {
-      const imported = sqliteRequire('better-sqlite3') as SqliteModule
-      const Database = typeof imported === 'function' ? imported : imported.default
-      
-      // Ensure directory exists
       const dir = path.dirname(filePath)
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true })
       }
 
-      db = new Database(filePath)
-
-      // Create tables
-      db.exec(`
-        CREATE TABLE IF NOT EXISTS cache_entries (
-          key TEXT PRIMARY KEY,
-          value TEXT NOT NULL,
-          expires_at INTEGER,
-          created_at INTEGER NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS cache_tags (
-          key TEXT NOT NULL,
-          tag TEXT NOT NULL,
-          PRIMARY KEY (key, tag),
-          FOREIGN KEY (key) REFERENCES cache_entries(key) ON DELETE CASCADE
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_cache_tags_tag ON cache_tags(tag);
-        CREATE INDEX IF NOT EXISTS idx_cache_entries_expires_at ON cache_entries(expires_at);
-      `)
+      db = driver === 'node:sqlite' ? await openNodeSqlite(filePath) : openBetterSqlite(filePath)
+      db.exec(CREATE_TABLES_SQL)
 
       return db
     } catch (error) {
-      throw new CacheDependencyUnavailableError('sqlite', 'better-sqlite3', error)
+      throw new CacheDependencyUnavailableError('sqlite', driver, error)
     }
   }
 

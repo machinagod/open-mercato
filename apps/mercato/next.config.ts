@@ -21,6 +21,8 @@ const contentSecurityPolicy = [
 
 const nextConfig: NextConfig = {
   distDir: '.mercato/next',
+  // Env-gated self-contained output for the Deno Deploy target (no effect on normal builds).
+  ...(process.env.OM_STANDALONE === '1' ? { output: 'standalone' as const } : {}),
   experimental: {
     serverMinification: false,
     turbopackMinify: false,

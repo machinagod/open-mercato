@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import sharp from 'sharp'
 import { z } from 'zod'
 import type { OpenApiRouteDoc } from '@open-mercato/shared/lib/openapi'
 import { getAuthFromRequest } from '@open-mercato/shared/lib/auth/server'
@@ -19,7 +18,15 @@ import {
   validateImageDimensions,
   validateImageMagicBytes,
 } from '@open-mercato/core/modules/attachments/lib/imageSafety'
+import { getImageProcessor, type ImageFormat } from '@open-mercato/core/modules/attachments/lib/image'
 import { StorageDriverFactory } from '../../../../lib/drivers'
+
+const MIME_TO_FORMAT: Record<string, ImageFormat> = {
+  'image/jpeg': 'jpeg',
+  'image/png': 'png',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+}
 
 const querySchema = z.object({
   width: z.coerce.number().int().min(1).max(4000).optional(),
@@ -97,22 +104,14 @@ export async function GET(
         return NextResponse.json({ error: dimensionsValidation.error }, { status: dimensionsValidation.status })
       }
 
-      let transformer = sharp(input, {
-        failOn: 'error',
-        limitInputPixels: MAX_IMAGE_SOURCE_PIXELS,
+      const processor = await getImageProcessor()
+      buffer = await processor.resize(input, {
+        width: width || undefined,
+        height: height || undefined,
+        fit: cropType === 'contain' ? 'contain' : 'cover',
+        limitPixels: MAX_IMAGE_SOURCE_PIXELS,
+        format: MIME_TO_FORMAT[magicBytesValidation.mimeType] ?? 'jpeg',
       })
-      if (width || height) {
-        const resizeOptions: sharp.ResizeOptions = {
-          width: width || undefined,
-          height: height || undefined,
-          fit: cropType === 'contain' ? 'contain' : 'cover',
-        }
-        if (cropType === 'contain') {
-          resizeOptions.background = { r: 0, g: 0, b: 0, alpha: 0 }
-        }
-        transformer = transformer.resize(resizeOptions)
-      }
-      buffer = await transformer.toBuffer()
       if (cacheKey) {
         void writeThumbnailCache(attachment.partitionCode, attachment.id, cacheKey, buffer).catch((cacheError) => {
           console.error('attachments.image.cache.write failed', cacheError)

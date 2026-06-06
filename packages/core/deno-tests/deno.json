@@ -1,0 +1,4 @@
+{
+  "imports": { "wasm-vips": "npm:wasm-vips@0.0.13" },
+  "nodeModulesDir": "none"
+}

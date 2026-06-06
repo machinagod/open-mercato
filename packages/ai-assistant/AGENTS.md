@@ -583,9 +583,16 @@ Use 2 meta-tools instead of individual endpoint/schema tools. The AI writes Java
 3. Agent calls `search({ code: 'async () => spec.paths["/api/customers/companies"]?.get' })` to see endpoint details
 4. Agent calls `execute({ code: 'async () => api.request({ method: "GET", path: "/api/customers/companies", query: { city: "New York" } })' })`
 
-**Sandbox safety**: Code runs in `node:vm` with only whitelisted globals. `fetch`, `require`, `process`, `fs`, `Buffer`, and network APIs are blocked. Execution times out after 30 seconds. API calls are capped at 50 per execution.
+**Sandbox safety**: Code runs in an isolated engine with only whitelisted globals. `fetch`, `require`, `process`, `fs`, `Buffer`, and network APIs are blocked. Execution times out after 30 seconds. API calls are capped at 50 per execution.
 
-**When modifying Code Mode tools**: Edit `lib/codemode-tools.ts` for tool definitions, `lib/sandbox.ts` for the sandbox engine, `lib/truncate.ts` for response size limiting.
+**Runtime-selected engine** (`lib/sandbox/`): the engine is chosen at runtime so the native `isolated-vm` addon never loads under Deno (it can't):
+- `sandbox/shared.ts` — contract (`SandboxOptions`/`SandboxResult`/`Sandbox`), `normalizeCode`, `isDenoRuntime`.
+- `sandbox/ivm.ts` — **Node** engine (isolated-vm; fresh V8 isolate per run).
+- `sandbox/worker.ts` — **Deno** engine (`Worker`); ports the same SharedArrayBuffer+Atomics bridge so injected host functions (`spec.findEndpoints`, `api.request`) stay **synchronous** inside the sandbox. Hardens the worker global + shadows dangerous globals. OS-level `permissions:"none"` is opt-in via `OM_SANDBOX_WORKER_PERMISSIONS=none` **and** running Deno with `--unstable-worker-options` (gated, not probed — the option fails uncatchably without the flag). Default = hardened-worker path (note: only `permissions:"none"` fully closes the dynamic-`import()` vector).
+- `sandbox/index.ts` — lazy runtime selection; `lib/sandbox.ts` re-exports it (import path unchanged).
+- Tests: Node/ivm in `lib/__tests__/sandbox.test.ts` (Jest); Deno/worker in `deno-tests/sandbox-worker.test.ts` (`deno test -A --no-check --sloppy-imports …`).
+
+**When modifying Code Mode tools**: Edit `lib/codemode-tools.ts` for tool definitions, `lib/sandbox/` for the sandbox engines (keep both in sync via `shared.ts`), `lib/truncate.ts` for response size limiting.
 
 ## Model Resolution
 

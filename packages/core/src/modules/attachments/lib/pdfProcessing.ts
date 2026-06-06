@@ -131,11 +131,20 @@ export async function preparePdfPagesForOcr(filePath: string): Promise<PdfOcrPre
           continue
         }
 
-        pages.push({
-          pageNumber,
-          extractedText: null,
-          imageBuffer: await renderPdfPageToImageBuffer(page, pdfDocument.canvasFactory),
-        })
+        // Render the page to an image for OCR. Requires a canvas backend
+        // (@napi-rs/canvas). When it's unavailable (e.g. the runtime can't load
+        // the native addon), degrade gracefully to text-only — the page yields
+        // no OCR image rather than crashing the whole extraction.
+        let imageBuffer: Buffer | null = null
+        const canvasFactory = pdfDocument.canvasFactory as PdfCanvasFactoryLike | undefined
+        if (canvasFactory) {
+          try {
+            imageBuffer = await renderPdfPageToImageBuffer(page, canvasFactory)
+          } catch {
+            imageBuffer = null
+          }
+        }
+        pages.push({ pageNumber, extractedText: null, imageBuffer })
       } finally {
         page.cleanup()
       }

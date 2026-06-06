@@ -1,4 +1,4 @@
-import sharp from 'sharp'
+import { getImageProcessor } from './image'
 
 export const MAX_IMAGE_SOURCE_BYTES = 25 * 1024 * 1024
 export const MAX_IMAGE_SOURCE_PIXELS = 40_000_000
@@ -92,18 +92,13 @@ export function validateImageMagicBytes(buffer: Buffer, declaredMimeType: string
 }
 
 export async function validateImageDimensions(buffer: Buffer): Promise<ImageSafetyResult> {
-  let metadata: sharp.Metadata
-  try {
-    metadata = await sharp(buffer, {
-      failOn: 'error',
-      limitInputPixels: MAX_IMAGE_SOURCE_PIXELS,
-    }).metadata()
-  } catch {
+  const processor = await getImageProcessor()
+  const dimensions = await processor.readDimensions(buffer, MAX_IMAGE_SOURCE_PIXELS)
+  if (!dimensions) {
     return { ok: false, status: 400, error: 'Invalid image content' }
   }
 
-  const width = metadata.width ?? 0
-  const height = metadata.height ?? 0
+  const { width, height } = dimensions
   if (width <= 0 || height <= 0) {
     return { ok: false, status: 400, error: 'Invalid image dimensions' }
   }
@@ -112,5 +107,5 @@ export async function validateImageDimensions(buffer: Buffer): Promise<ImageSafe
     return { ok: false, status: 413, error: 'Image exceeds pixel limit' }
   }
 
-  return { ok: true, mimeType: metadata.format ? `image/${metadata.format}` : 'image/jpeg' }
+  return { ok: true, mimeType: detectImageMimeType(buffer) ?? 'image/jpeg' }
 }
