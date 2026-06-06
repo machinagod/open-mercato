@@ -126,3 +126,18 @@ Runtime adapters for sandbox / SQLite / images / canvas. Prereq for any Deno run
   - **What it does unlock:** a smaller, cleaner **prebuilt bundle** — build the CRM-slim app **locally on Node**, `deno bundle` it, upload → sidesteps the 5-min builder cap *and* the standalone `node_modules`-shipping gap. This is the recommended path for a CRM-only Deno Deploy.
   - **To cut build-on-Deploy further** would require splitting `@open-mercato/core` into per-module packages (so `build:packages` skips commerce/AI/etc.) + pruning deps — a larger refactor (the literal "break up the modules").
   - PR note: the 2 build fixes pertain to PR #1's adapter but currently sit in PR #2 (stacked); merge #1+#2 together or cherry-pick the 2 files to #1.
+
+### DECISIVE VERDICT — the full Next app cannot deploy to Deno Deploy (any current path)
+All three Phase-4 paths are now empirically closed — and the CRM slimming, while it shrank the app (197MB standalone, 7.8s build), does **not** unblock any of them:
+1. **Framework preset (build on Deploy) — DEAD, not even a plan upgrade fixes it.** Deno Deploy runs build commands under **Deno node-compat**, and the Node toolchain doesn't run there: corepack crashes (`node:crypto` "Digest already called") **and** a direct yarn 4 release crashes (`Error: Dynamic require of "util" is not supported`). No way to bootstrap yarn 4 → can't install/build the workspace monorepo. (`next build` is similarly Node-native.)
+2. **Prebuilt standalone (upload) — DEAD.** Deno Deploy's dynamic runtime ships only the statically-traced module graph; Next standalone's CJS `require('next')` + `node_modules` aren't carried.
+3. **`deno bundle` the standalone — DEAD.** Bundling Next's server fails resolving react-dom's pruned conditional dev/prod export files (`react-dom-server.node.development.js` not found) — Next's server isn't `deno bundle`-able.
+
+**Conclusion:** the **runtime** is Deno-compatible (proven: `next start` serves under Deno; native deps replaced; Postgres backbone works), but **Deno Deploy's build + packaging model is fundamentally incompatible** with this Next + yarn-workspace monorepo. This is a platform/toolchain mismatch, not a code or plan-tier issue.
+
+**Viable alternatives (recommended):**
+- **(A) Host the Next app on a Node/Deno container** (Fly/Railway/Cloud Run/etc.) that runs the prebuilt standalone with `next start` — the runtime is ready; only Deno Deploy's build model is the blocker. Lowest effort, keeps the full app.
+- **(B) Use Deno Deploy only for extracted Deno-native services.** A single-file `deno bundle` of a **non-Next** Deno service deploys + runs on an isolate cleanly (proven: the data slice). A CRM **API** could be re-expressed as a Deno-native service (Hono/Oak + the MikroORM customers entities, which run under Deno against Prisma Postgres) and deployed there — without the Next UI.
+- **(C) Split `@open-mercato/core` into per-module packages + drop the yarn-workspace build from the deploy** — large refactor; still bounded by yarn-not-running-on-the-Deno-builder unless the deployed unit avoids a workspace install entirely.
+
+The native-dep removal + Postgres backbone (PRs #1, #2) remain the necessary foundation for any of these — they make the app Deno-runtime-ready regardless of host.
