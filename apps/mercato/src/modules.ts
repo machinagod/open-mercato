@@ -160,3 +160,7 @@ if (enterpriseModulesEnabled && enterpriseSsoEnabled) {
 if (enterpriseModulesEnabled && enterpriseSecurityEnabled) {
   enabledModules.push({ id: 'security', from: '@open-mercato/enterprise' })
 }
+
+// Build-time module selection (app slimming) is applied by the generator's
+// module resolver from OM_MODULE_PRESET / OM_ENABLED_MODULES — see
+// packages/cli/src/lib/resolver.ts. modules.ts stays the canonical full set.

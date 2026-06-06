@@ -302,7 +302,32 @@ function parseModulesFromSource(source: string, env: NodeJS.ProcessEnv = process
     }
   }
 
-  return modules
+  return applyModuleSelection(modules, env)
+}
+
+// Opt-in generate-time module selection (app slimming → fewer routes → faster
+// builds, fits tighter deploy build caps). Non-destructive: unset = full app.
+//   OM_MODULE_PRESET=crm                 (named preset below)
+//   OM_ENABLED_MODULES=customers,auth,…  (explicit comma-separated ids; wins over preset)
+// The selection intersects with what's already enabled, so env-gated modules
+// (e.g. enterprise sso/security) only appear when their own flags are also set.
+const MODULE_PRESETS: Record<string, string[]> = {
+  crm: [
+    'auth', 'directory', 'configs', 'events', 'query_index', 'entities', 'dashboards',
+    'audit_logs', 'currencies', 'dictionaries', 'feature_toggles', 'translations',
+    'notifications', 'progress', 'attachments', 'perspectives', 'onboarding', 'customers',
+    'catalog', 'sso', 'security',
+  ],
+}
+const ALWAYS_ON_MODULE_IDS = ['auth', 'directory', 'configs', 'events']
+
+function applyModuleSelection(modules: ModuleEntry[], env: NodeJS.ProcessEnv): ModuleEntry[] {
+  const explicit = (env.OM_ENABLED_MODULES || '').split(',').map((s) => s.trim()).filter(Boolean)
+  const preset = MODULE_PRESETS[(env.OM_MODULE_PRESET || '').trim()]
+  const selected = explicit.length ? explicit : preset
+  if (!selected) return modules
+  const allow = new Set([...selected, ...ALWAYS_ON_MODULE_IDS])
+  return modules.filter((entry) => allow.has(entry.id))
 }
 
 function readEnabledModulesFromConfig(cfgPath: string): ModuleEntry[] {
