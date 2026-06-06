@@ -92,9 +92,11 @@ export type CacheStrategy = {
 }
 
 export type CacheServiceOptions = {
-  strategy?: 'memory' | 'redis' | 'sqlite' | 'jsonfile'
+  strategy?: 'memory' | 'redis' | 'sqlite' | 'jsonfile' | 'postgres'
   redisUrl?: string
   sqlitePath?: string
   jsonFilePath?: string
+  /** Postgres connection string for the `postgres` strategy. Defaults to DATABASE_URL. */
+  postgresUrl?: string
   defaultTtl?: number
 }

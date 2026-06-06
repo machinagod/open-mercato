@@ -1,0 +1,4 @@
+{
+  "imports": { "pg": "npm:pg@8.21.0" },
+  "nodeModulesDir": "none"
+}

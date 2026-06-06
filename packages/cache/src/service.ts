@@ -3,6 +3,7 @@ import { createMemoryStrategy } from './strategies/memory'
 import { createRedisStrategy } from './strategies/redis'
 import { createSqliteStrategy } from './strategies/sqlite'
 import { createJsonFileStrategy } from './strategies/jsonfile'
+import { createPostgresStrategy } from './strategies/postgres'
 import { getCurrentCacheTenant } from './tenantContext'
 import { createHash } from 'node:crypto'
 import { CacheDependencyUnavailableError } from './errors'
@@ -40,7 +41,7 @@ function isCacheMetadata(value: CacheValue | null): value is CacheMetadata {
 }
 
 type CacheStrategyName = NonNullable<CacheServiceOptions['strategy']>
-const KNOWN_STRATEGIES: CacheStrategyName[] = ['memory', 'redis', 'sqlite', 'jsonfile']
+const KNOWN_STRATEGIES: CacheStrategyName[] = ['memory', 'redis', 'sqlite', 'jsonfile', 'postgres']
 
 function isCacheStrategyName(value: string | undefined): value is CacheStrategyName {
   if (!value) return false
@@ -199,7 +200,7 @@ function createTenantAwareWrapper(base: CacheStrategy): CacheStrategy {
  * Cache service that provides a unified interface to different cache strategies
  * 
  * Configuration via environment variables:
- * - CACHE_STRATEGY: 'memory' | 'redis' | 'sqlite' | 'jsonfile' (default: 'memory')
+ * - CACHE_STRATEGY: 'memory' | 'redis' | 'sqlite' | 'postgres' | 'jsonfile' (default: 'memory')
  * - CACHE_TTL: Default TTL in milliseconds (optional)
  * - CACHE_REDIS_URL: Redis connection URL (for redis strategy)
  * - CACHE_SQLITE_PATH: SQLite database file path (for sqlite strategy)
@@ -290,6 +291,8 @@ function createStrategyForType(strategyType: CacheStrategyName, options?: CacheS
       return createRedisStrategy(options?.redisUrl, { defaultTtl })
     case 'sqlite':
       return createSqliteStrategy(options?.sqlitePath, { defaultTtl })
+    case 'postgres':
+      return createPostgresStrategy(options?.postgresUrl, { defaultTtl })
     case 'jsonfile':
       return createJsonFileStrategy(options?.jsonFilePath, { defaultTtl })
     case 'memory':
