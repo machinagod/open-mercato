@@ -1,0 +1,22 @@
+{
+  "tasks": {
+    "build:packages": "deno run -A scripts/build-packages-deno.mjs",
+    "build:packages:crm": "deno run -A scripts/build-packages-deno.mjs core ui onboarding content events search",
+
+    "generate": "deno run -A packages/cli/dist/bin.js generate",
+    "generate:crm": "OM_MODULE_PRESET=crm deno run -A packages/cli/dist/bin.js generate",
+
+    "next:build": "cd apps/mercato && deno run -A ../../node_modules/next/dist/bin/next build",
+    "next:build:crm": "cd apps/mercato && OM_MODULE_PRESET=crm deno run -A ../../node_modules/next/dist/bin/next build",
+    "next:start": "cd apps/mercato && deno run -A ../../node_modules/next/dist/bin/next start",
+
+    "build:crm": "deno task build:packages:crm && deno task generate:crm && deno task next:build:crm",
+    "build:deno": "deno task build:packages && deno task generate && deno task next:build"
+  },
+  "imports": {
+    "@std/assert": "jsr:@std/assert@1"
+  },
+  "deploy": {
+    "org": "machinagod-sandbox"
+  }
+}
