@@ -18,7 +18,7 @@ import {
   validateImageDimensions,
   validateImageMagicBytes,
 } from '@open-mercato/core/modules/attachments/lib/imageSafety'
-import { getImageProcessor, type ImageFormat } from '@open-mercato/core/modules/attachments/lib/image'
+import { getImageProcessor, type ImageFormat } from '../../../../lib/image'
 import { StorageDriverFactory } from '../../../../lib/drivers'
 
 const MIME_TO_FORMAT: Record<string, ImageFormat> = {

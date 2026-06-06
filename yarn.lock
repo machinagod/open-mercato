@@ -6007,13 +6007,18 @@ __metadata:
     ts-jest: "npm:^29.4.11"
     tw-animate-css: "npm:^1.4.0"
     typescript: "npm:^6.0.3"
+    wasm-vips: "npm:^0.0.13"
     zod: "npm:^4.4.3"
   dependenciesMeta:
+    "@napi-rs/canvas":
+      optional: true
     better-sqlite3:
       optional: true
     bullmq:
       optional: true
     ioredis:
+      optional: true
+    wasm-vips:
       optional: true
   languageName: unknown
   linkType: soft
@@ -6030,10 +6035,13 @@ __metadata:
   peerDependencies:
     better-sqlite3: ">=9.0.0"
     ioredis: ^5.0.0
+    pg: ^8.0.0
   peerDependenciesMeta:
     better-sqlite3:
       optional: true
     ioredis:
+      optional: true
+    pg:
       optional: true
   languageName: unknown
   linkType: soft
@@ -26596,6 +26604,13 @@ __metadata:
   dependencies:
     loose-envify: "npm:^1.0.0"
   checksum: 10/e7842aff036e2e07ce7a6cc3225e707775b969fe3d0577ad64bd24660e3a9ce3017f0b8c22a136566dcd3a151f37b8ed1ccee103b3bd82bd8a571bf80b247bc4
+  languageName: node
+  linkType: hard
+
+"wasm-vips@npm:^0.0.13":
+  version: 0.0.13
+  resolution: "wasm-vips@npm:0.0.13"
+  checksum: 10/6b0b5449d199d33aca35662da2cc38023928a5854baaee67e23d0a17edd879e346ad2e0a9f3fcb6aa8997c510d63a3acfac49a35f7e117f407d6d975ec7ca8b0
   languageName: node
   linkType: hard
 

@@ -51,6 +51,9 @@ const nextConfig: NextConfig = {
     'esbuild',
     '@esbuild/darwin-arm64',
     '@open-mercato/cli',
+    // Deno-only image engine (wasm-vips); the sharp engine is used on Node.
+    // Externalized so Turbopack does not try to bundle the optional dep.
+    'wasm-vips',
   ],
   // Mirror server-only env vars that client components must observe. Keep this
   // list minimal — anything added here is inlined into the client bundle.
